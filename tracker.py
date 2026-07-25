@@ -26,6 +26,7 @@ from config import (
 )
 
 
+ARAM_MAYHEM_QUEUE_ID = 2400
 bot = None
 match_check_lock = asyncio.Lock()
 
@@ -103,7 +104,23 @@ async def _check_matches_once(
 
         matches = await get_recent_matches(
             user[1]
-        )
+        ) or []
+
+
+        mayhem_matches = await get_recent_matches(
+            user[1],
+            queue=ARAM_MAYHEM_QUEUE_ID,
+            count=1
+        ) or []
+
+
+        if mayhem_matches:
+
+            matches = list(
+                dict.fromkeys(
+                    matches + mayhem_matches
+                )
+            )
 
 
         if not matches:

@@ -6,7 +6,7 @@ import math
 import time
 
 from riot_api import get_account
-from database import add_user
+from database import add_user, delete_user
 from tracker import check_matches_once
 
 
@@ -111,6 +111,35 @@ async def setup_commands(tree):
     tree.add_command(
         riot_group
     )
+
+
+    @tree.command(
+        name="unlink",
+        description="Unlink your Riot account"
+    )
+    async def unlink(interaction: discord.Interaction):
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
+
+
+        unlinked = await delete_user(
+            interaction.user.id
+        )
+
+
+        message = (
+            "Your Riot account has been unlinked."
+            if unlinked
+            else "You do not have a linked Riot account."
+        )
+
+
+        await interaction.followup.send(
+            message,
+            ephemeral=True
+        )
 
 
     @tree.command(

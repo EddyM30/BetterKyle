@@ -45,14 +45,21 @@ async def get_account(
 
 
 async def get_recent_matches(
-    puuid
+    puuid,
+    queue=None,
+    count=5
 ):
 
     url = (
         f"{RIOT_REGION}/lol/match/v5/"
         f"matches/by-puuid/{puuid}/ids"
-        "?start=0&count=5"
+        f"?start=0&count={count}"
     )
+
+
+    if queue is not None:
+
+        url += f"&queue={queue}"
 
     return await riot_request(url)
 

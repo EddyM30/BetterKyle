@@ -101,6 +101,26 @@ async def add_user(
 
 
 
+async def delete_user(
+    discord_id
+):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cursor = await db.execute(
+        """
+        DELETE FROM users
+        WHERE discord_id=?
+        """,
+        (discord_id,)
+        )
+
+        await db.commit()
+
+        return cursor.rowcount > 0
+
+
+
 async def get_users():
 
     async with aiosqlite.connect(DATABASE) as db:
