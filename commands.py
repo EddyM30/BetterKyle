@@ -88,8 +88,22 @@ async def setup_commands(tree):
 
 
 
+        posted_match = await check_matches_once(
+            account["puuid"]
+        )
+
+
+        match_message = (
+            " Latest allowed match announced."
+            if posted_match
+            else ""
+        )
+
+
+
         await interaction.followup.send(
             f"Linked {account['gameName']}#{account['tagLine']}"
+            f".{match_message}"
         )
 
 

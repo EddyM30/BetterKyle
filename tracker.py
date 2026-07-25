@@ -8,6 +8,7 @@ from database import (
     get_users,
     match_exists,
     save_match,
+    update_last_match,
     update_streak
 )
 
@@ -40,18 +41,32 @@ def set_bot(
 
 
 
-async def check_matches_once():
+async def check_matches_once(
+    target_puuid=None
+):
 
     """Check for unannounced matches and return how many were posted."""
 
     async with match_check_lock:
-        return await _check_matches_once()
+        return await _check_matches_once(
+            target_puuid
+        )
 
 
-async def _check_matches_once():
+async def _check_matches_once(
+    target_puuid=None
+):
 
     users = await get_users()
 
+
+    if target_puuid:
+
+        users = [
+            user
+            for user in users
+            if user[1] == target_puuid
+        ]
 
     tracked = {
         user[1]: user
@@ -60,19 +75,19 @@ async def _check_matches_once():
 
 
 
-    processed = set()
-    posted_matches = 0
+    candidates = []
+    excluded_match_ids = set()
+    baseline_marker_updates = {}
+    marker_updates = {}
+    api_lookup_failed = False
 
 
 
     for user in users:
 
 
-        puuid = user[1]
-
-
         matches = await get_recent_matches(
-            puuid
+            user[1]
         )
 
 
@@ -82,99 +97,140 @@ async def _check_matches_once():
 
 
 
-        # Riot returns recent matches newest first. Looking at several lets a
-        # newly finished allowed game be found even when a custom, bot, or
-        # other excluded game is more recent.
-        for match_id in matches:
-
-            if match_id in processed:
-
-                continue
+        match_id = matches[0]
 
 
 
-            if await match_exists(
+        # Accounts restored from a reset silently establish a baseline.
+        # Accounts linked with /riot link are marked to announce their latest
+        # allowed match once, even though they do not have a marker yet.
+        if user[4] is None and not user[5]:
+
+            baseline_marker_updates[user[0]] = match_id
+
+            continue
+
+
+
+        if match_id == user[4]:
+
+            continue
+
+
+
+        match = await get_match(
+            match_id
+        )
+
+
+
+        if not match:
+
+            # Do not move this account's marker until Riot returns the match.
+            api_lookup_failed = True
+
+            continue
+
+
+
+        marker_updates[user[0]] = match_id
+
+
+
+        if await match_exists(
+            match_id
+        ):
+
+            continue
+
+
+
+        if match["info"].get("queueId") not in ALLOWED_QUEUES:
+
+            excluded_match_ids.add(
                 match_id
-            ):
+            )
 
-                continue
+            continue
 
 
 
-            processed.add(
+        candidates.append(
+            (match_id, match)
+        )
+
+
+
+    if api_lookup_failed:
+
+        for discord_id, match_id in baseline_marker_updates.items():
+
+            await update_last_match(
+                discord_id,
                 match_id
-
             )
 
 
+        return 0
 
-            match = await get_match(
-                match_id
+
+
+    posted_match = False
+
+
+
+    if candidates:
+
+        latest_match_id, latest_match = max(
+            candidates,
+            key=lambda candidate: candidate[1]["info"].get(
+                "gameEndTimestamp",
+                candidate[1]["info"].get("gameCreation", 0)
             )
+        )
 
 
 
-            if not match:
-
-                continue
+        party = []
 
 
 
-            if match["info"].get("queueId") not in ALLOWED_QUEUES:
+        for player in latest_match["info"]["participants"]:
 
-                # Do not announce excluded or inactive queues.
-                await save_match(
-                    match_id
+
+            if player["puuid"] in tracked:
+
+                linked_user = tracked[player["puuid"]]
+
+                # Keep the Discord user alongside the Riot participant so the
+                # announcement can say whose linked account played the match.
+                player["discord_id"] = linked_user[0]
+                player["riot_name"] = linked_user[2]
+
+                party.append(
+                    player
                 )
 
-                continue
+
+                result = (
+                    "win"
+                    if player["win"]
+                    else
+                    "loss"
+                )
+
+
+                await update_streak(
+
+                    linked_user[0],
+
+                    result
+
+                )
 
 
 
-            party = []
-
-
-
-            for player in match["info"]["participants"]:
-
-
-                if player["puuid"] in tracked:
-
-                    linked_user = tracked[player["puuid"]]
-
-                    # Keep the Discord user alongside the Riot participant so the
-                    # announcement can say whose linked account played the match.
-                    player["discord_id"] = linked_user[0]
-                    player["riot_name"] = linked_user[2]
-
-                    party.append(
-                        player
-                    )
-
-
-                    result = (
-                        "win"
-                        if player["win"]
-                        else
-                        "loss"
-                    )
-
-
-                    await update_streak(
-
-                        tracked[player["puuid"]][0],
-
-                        result
-
-                    )
-
-
-
-            if not party:
-
-                continue
-
-
+        if party:
 
             channel = bot.get_channel(
                 CHANNEL_ID
@@ -186,7 +242,7 @@ async def _check_matches_once():
 
                 embed=create_match_embed(
 
-                    match,
+                    latest_match,
 
                     party
 
@@ -195,19 +251,53 @@ async def _check_matches_once():
             )
 
 
-
-            await save_match(
-                match_id
-            )
-
-            posted_matches += 1
-
-            # One announcement per linked player per check is enough; this
-            # prevents an old backlog from being posted all at once.
-            break
+            posted_match = True
 
 
-    return posted_matches
+
+        await save_match(
+            latest_match_id
+        )
+
+
+
+        # Ignore other new matches from the same check. Only the newest
+        # match should ever be announced.
+        for match_id, _ in candidates:
+
+            if match_id != latest_match_id:
+
+                await save_match(
+                    match_id
+                )
+
+
+
+    for match_id in excluded_match_ids:
+
+        await save_match(
+            match_id
+        )
+
+
+
+    all_marker_updates = {
+        **baseline_marker_updates,
+        **marker_updates
+    }
+
+
+
+    for discord_id, match_id in all_marker_updates.items():
+
+        await update_last_match(
+            discord_id,
+            match_id
+        )
+
+
+
+    return int(posted_match)
 
 
 

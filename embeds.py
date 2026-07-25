@@ -131,6 +131,18 @@ def create_match_embed(
 
 
         highlights = []
+        in_game_name = (
+            player.get("riotIdGameName")
+            or player["summonerName"]
+        )
+
+        discord_user = ""
+
+        if player.get("discord_id"):
+
+            discord_user = (
+                f" (<@{player['discord_id']}>)"
+            )
 
 
 
@@ -176,7 +188,7 @@ def create_match_embed(
 
             name=(
 
-                f"👤 {player['summonerName']}"
+                f"👤 {in_game_name}{discord_user}"
 
             ),
 

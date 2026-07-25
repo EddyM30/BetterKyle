@@ -23,12 +23,34 @@ async def setup_database():
 
             last_match TEXT,
 
+            announce_initial INTEGER DEFAULT 0,
+
             streak_type TEXT DEFAULT 'none',
 
             streak_count INTEGER DEFAULT 0
 
         )
         """)
+
+
+        cursor = await db.execute(
+            "PRAGMA table_info(users)"
+        )
+
+        columns = {
+            column[1]
+            for column in await cursor.fetchall()
+        }
+
+
+        if "announce_initial" not in columns:
+
+            await db.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN announce_initial INTEGER DEFAULT 0
+                """
+            )
 
 
         await db.execute("""
@@ -60,17 +82,19 @@ async def add_user(
             discord_id,
             puuid,
             riot_name,
-            riot_tag
+            riot_tag,
+            announce_initial
         )
 
-        VALUES(?,?,?,?)
+        VALUES(?,?,?,?,?)
 
         """,
         (
             discord_id,
             puuid,
             name,
-            tag
+            tag,
+            1
         ))
 
         await db.commit()
@@ -82,7 +106,18 @@ async def get_users():
     async with aiosqlite.connect(DATABASE) as db:
 
         cursor = await db.execute(
-            "SELECT * FROM users"
+        """
+        SELECT
+            discord_id,
+            puuid,
+            riot_name,
+            riot_tag,
+            last_match,
+            announce_initial,
+            streak_type,
+            streak_count
+        FROM users
+        """
         )
 
         return await cursor.fetchall()
@@ -105,6 +140,31 @@ async def get_user_by_puuid(
         )
 
         return await cursor.fetchone()
+
+
+
+async def update_last_match(
+    discord_id,
+    match_id
+):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        await db.execute(
+        """
+        UPDATE users
+        SET
+            last_match=?,
+            announce_initial=0
+        WHERE discord_id=?
+        """,
+        (
+            match_id,
+            discord_id
+        )
+        )
+
+        await db.commit()
 
 
 
