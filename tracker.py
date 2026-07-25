@@ -82,123 +82,129 @@ async def _check_matches_once():
 
 
 
-        match_id = matches[0]
+        # Riot returns recent matches newest first. Looking at several lets a
+        # newly finished allowed game be found even when a custom, bot, or
+        # other excluded game is more recent.
+        for match_id in matches:
+
+            if match_id in processed:
+
+                continue
 
 
 
-        if match_id in processed:
+            if await match_exists(
+                match_id
+            ):
 
-            continue
-
-
-
-        if await match_exists(
-            match_id
-        ):
-
-            continue
+                continue
 
 
 
-        processed.add(
-            match_id
-        )
+            processed.add(
+                match_id
+
+            )
 
 
 
-        match = await get_match(
-            match_id
-        )
+            match = await get_match(
+                match_id
+            )
 
 
 
-        if not match:
+            if not match:
 
-            continue
+                continue
 
 
 
-        if match["info"].get("queueId") not in ALLOWED_QUEUES:
+            if match["info"].get("queueId") not in ALLOWED_QUEUES:
 
-            # Do not announce excluded or inactive queues.
+                # Do not announce excluded or inactive queues.
+                await save_match(
+                    match_id
+                )
+
+                continue
+
+
+
+            party = []
+
+
+
+            for player in match["info"]["participants"]:
+
+
+                if player["puuid"] in tracked:
+
+                    linked_user = tracked[player["puuid"]]
+
+                    # Keep the Discord user alongside the Riot participant so the
+                    # announcement can say whose linked account played the match.
+                    player["discord_id"] = linked_user[0]
+                    player["riot_name"] = linked_user[2]
+
+                    party.append(
+                        player
+                    )
+
+
+                    result = (
+                        "win"
+                        if player["win"]
+                        else
+                        "loss"
+                    )
+
+
+                    await update_streak(
+
+                        tracked[player["puuid"]][0],
+
+                        result
+
+                    )
+
+
+
+            if not party:
+
+                continue
+
+
+
+            channel = bot.get_channel(
+                CHANNEL_ID
+            )
+
+
+
+            await channel.send(
+
+                embed=create_match_embed(
+
+                    match,
+
+                    party
+
+                )
+
+            )
+
+
+
             await save_match(
                 match_id
             )
 
-            continue
+            posted_matches += 1
 
-
-
-        party = []
-
-
-
-        for player in match["info"]["participants"]:
-
-
-            if player["puuid"] in tracked:
-
-                linked_user = tracked[player["puuid"]]
-
-                # Keep the Discord user alongside the Riot participant so the
-                # announcement can say whose linked account played the match.
-                player["discord_id"] = linked_user[0]
-                player["riot_name"] = linked_user[2]
-
-                party.append(
-                    player
-                )
-
-
-                result = (
-                    "win"
-                    if player["win"]
-                    else
-                    "loss"
-                )
-
-
-                await update_streak(
-
-                    tracked[player["puuid"]][0],
-
-                    result
-
-                )
-
-
-
-        if not party:
-
-            continue
-
-
-
-        channel = bot.get_channel(
-            CHANNEL_ID
-        )
-
-
-
-        await channel.send(
-
-            embed=create_match_embed(
-
-                match,
-
-                party
-
-            )
-
-        )
-
-
-
-        await save_match(
-            match_id
-        )
-
-        posted_matches += 1
+            # One announcement per linked player per check is enough; this
+            # prevents an old backlog from being posted all at once.
+            break
 
 
     return posted_matches

@@ -43,6 +43,11 @@ async def on_ready():
         # Guild command sync is nearly immediate. Global commands can take up
         # to an hour to appear, which makes newly added commands look missing.
         tree.copy_global_to(guild=guild)
+
+        # Remove the old global copies so Discord shows one version of each
+        # command in this server, not a global and guild-specific duplicate.
+        tree.clear_commands(guild=None)
+        await tree.sync()
         await tree.sync(guild=guild)
 
         commands_registered = True
