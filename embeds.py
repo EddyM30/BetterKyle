@@ -7,9 +7,10 @@ QUEUE_NAMES = {
 
     400: "Normal Draft",
     420: "Ranked Solo/Duo",
-    430: "Normal Blind",
     440: "Ranked Flex",
-    450: "ARAM"
+    450: "ARAM",
+    480: "Swiftplay",
+    2400: "ARAM: Mayhem"
 
 }
 

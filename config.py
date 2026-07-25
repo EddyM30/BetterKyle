@@ -1,6 +1,8 @@
 #Options
 
 import os
+import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 
@@ -20,6 +22,24 @@ CHANNEL_ID = int(
 GUILD_ID = int(
     os.getenv("GUILD_ID")
 )
+
+
+with open(
+    Path(__file__).parent / "data" / "config.json",
+    encoding="utf-8"
+) as config_file:
+
+    game_config = json.load(config_file)
+
+
+ALLOWED_QUEUES = frozenset(
+    game_config["allowed_queues"]
+)
+
+
+CHECK_INTERVAL_MINUTES = game_config[
+    "check_interval_minutes"
+]
 
 #Can add other regions later (we all US)
 

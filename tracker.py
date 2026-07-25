@@ -18,7 +18,11 @@ from riot_api import (
 
 from embeds import create_match_embed
 
-from config import CHANNEL_ID
+from config import (
+    ALLOWED_QUEUES,
+    CHANNEL_ID,
+    CHECK_INTERVAL_MINUTES
+)
 
 
 bot = None
@@ -114,6 +118,17 @@ async def _check_matches_once():
 
 
 
+        if match["info"].get("queueId") not in ALLOWED_QUEUES:
+
+            # Do not announce excluded or inactive queues.
+            await save_match(
+                match_id
+            )
+
+            continue
+
+
+
         party = []
 
 
@@ -193,7 +208,7 @@ async def _check_matches_once():
 
 
 @tasks.loop(
-    minutes=2
+    minutes=CHECK_INTERVAL_MINUTES
 )
 
 async def check_matches():

@@ -8,6 +8,7 @@ import os
 from database import setup_database
 from commands import setup_commands
 from tracker import check_matches, set_bot
+from config import GUILD_ID
 
 
 load_dotenv()
@@ -22,18 +23,29 @@ bot = discord.Client(
 )
 
 tree = discord.app_commands.CommandTree(bot)
+guild = discord.Object(id=GUILD_ID)
+commands_registered = False
 
 
 @bot.event
 async def on_ready():
 
+    global commands_registered
+
     print(f"Logged in as {bot.user}")
 
     await setup_database()
 
-    await setup_commands(tree)
+    if not commands_registered:
 
-    await tree.sync()
+        await setup_commands(tree)
+
+        # Guild command sync is nearly immediate. Global commands can take up
+        # to an hour to appear, which makes newly added commands look missing.
+        tree.copy_global_to(guild=guild)
+        await tree.sync(guild=guild)
+
+        commands_registered = True
 
     set_bot(bot)
 
