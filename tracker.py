@@ -1,11 +1,11 @@
 #If this fails to complie its bc loverboy texted me
-
 from discord.ext import tasks
 
 from database import (
     get_users,
     match_exists,
-    save_match
+    save_match,
+    update_streak
 )
 
 from riot_api import (
@@ -32,14 +32,20 @@ def set_bot(
 
 
 
-
 async def check_matches_once():
 
 
     users = await get_users()
 
 
-    checked = set()
+    tracked = {
+        user[1]: user
+        for user in users
+    }
+
+
+
+    processed = set()
 
 
 
@@ -55,6 +61,7 @@ async def check_matches_once():
 
 
         if not matches:
+
             continue
 
 
@@ -63,7 +70,8 @@ async def check_matches_once():
 
 
 
-        if match_id in checked:
+        if match_id in processed:
+
             continue
 
 
@@ -71,11 +79,12 @@ async def check_matches_once():
         if await match_exists(
             match_id
         ):
+
             continue
 
 
 
-        checked.add(
+        processed.add(
             match_id
         )
 
@@ -86,24 +95,75 @@ async def check_matches_once():
         )
 
 
-        if match:
+
+        if not match:
+
+            continue
 
 
-            channel = bot.get_channel(
-                CHANNEL_ID
-            )
+
+        party = []
 
 
-            await channel.send(
-                embed=create_match_embed(
-                    match
+
+        for player in match["info"]["participants"]:
+
+
+            if player["puuid"] in tracked:
+
+                party.append(
+                    player
                 )
-            )
 
 
-            await save_match(
-                match_id
+                result = (
+                    "win"
+                    if player["win"]
+                    else
+                    "loss"
+                )
+
+
+                await update_streak(
+
+                    tracked[player["puuid"]][0],
+
+                    result
+
+                )
+
+
+
+        if not party:
+
+            continue
+
+
+
+        channel = bot.get_channel(
+            CHANNEL_ID
+        )
+
+
+
+        await channel.send(
+
+            embed=create_match_embed(
+
+                match,
+
+                party
+
             )
+
+        )
+
+
+
+        await save_match(
+            match_id
+        )
+
 
 
 
@@ -111,6 +171,7 @@ async def check_matches_once():
 @tasks.loop(
     minutes=5
 )
+
 async def check_matches():
 
-    await check_matches_once()
+    await check_matches_once()    await check_matches_once()
