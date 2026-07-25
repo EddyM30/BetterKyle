@@ -174,4 +174,4 @@ async def check_matches_once():
 
 async def check_matches():
 
-    await check_matches_once()    await check_matches_once()
+    await check_matches_once()
