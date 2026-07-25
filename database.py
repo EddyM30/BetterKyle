@@ -198,4 +198,4 @@ async def save_match(
         (match_id,)
         )
 
-        await db.commit()
+        await db.commit()        await db.commit()
