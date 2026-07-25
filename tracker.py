@@ -1,4 +1,7 @@
-#If this fails to complie its bc loverboy texted me
+"""Match polling and publishing."""
+
+import asyncio
+
 from discord.ext import tasks
 
 from database import (
@@ -19,6 +22,7 @@ from config import CHANNEL_ID
 
 
 bot = None
+match_check_lock = asyncio.Lock()
 
 
 
@@ -34,6 +38,13 @@ def set_bot(
 
 async def check_matches_once():
 
+    """Check for unannounced matches and return how many were posted."""
+
+    async with match_check_lock:
+        return await _check_matches_once()
+
+
+async def _check_matches_once():
 
     users = await get_users()
 
@@ -46,6 +57,7 @@ async def check_matches_once():
 
 
     processed = set()
+    posted_matches = 0
 
 
 
@@ -111,6 +123,13 @@ async def check_matches_once():
 
             if player["puuid"] in tracked:
 
+                linked_user = tracked[player["puuid"]]
+
+                # Keep the Discord user alongside the Riot participant so the
+                # announcement can say whose linked account played the match.
+                player["discord_id"] = linked_user[0]
+                player["riot_name"] = linked_user[2]
+
                 party.append(
                     player
                 )
@@ -164,12 +183,17 @@ async def check_matches_once():
             match_id
         )
 
+        posted_matches += 1
+
+
+    return posted_matches
+
 
 
 
 
 @tasks.loop(
-    minutes=5
+    minutes=2
 )
 
 async def check_matches():

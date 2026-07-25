@@ -57,6 +57,32 @@ def create_match_embed(
 
     )
 
+    linked_players = []
+
+    for player in party_players:
+
+        riot_name = player.get(
+            "riot_name",
+            player["summonerName"]
+        )
+
+        discord_id = player.get("discord_id")
+
+        if discord_id:
+
+            linked_players.append(
+                f"<@{discord_id}> ({riot_name})"
+            )
+
+        else:
+
+            linked_players.append(riot_name)
+
+
+    embed.description = (
+        f"Match detected for {', '.join(linked_players)}"
+    )
+
 
 
     queue = QUEUE_NAMES.get(
