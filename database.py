@@ -1,11 +1,9 @@
 #Talk to me SQL
 #HATE SQL someone can look it over later
-
 import aiosqlite
 
 
 DATABASE = "users.db"
-
 
 
 async def setup_database():
@@ -25,7 +23,7 @@ async def setup_database():
 
             last_match TEXT,
 
-            streak_type TEXT,
+            streak_type TEXT DEFAULT 'none',
 
             streak_count INTEGER DEFAULT 0
 
@@ -59,12 +57,14 @@ async def add_user(
         """
         INSERT OR REPLACE INTO users
         (
-        discord_id,
-        puuid,
-        riot_name,
-        riot_tag
+            discord_id,
+            puuid,
+            riot_name,
+            riot_tag
         )
+
         VALUES(?,?,?,?)
+
         """,
         (
             discord_id,
@@ -89,6 +89,25 @@ async def get_users():
 
 
 
+async def get_user_by_puuid(
+    puuid
+):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cursor = await db.execute(
+        """
+        SELECT *
+        FROM users
+        WHERE puuid=?
+        """,
+        (puuid,)
+        )
+
+        return await cursor.fetchone()
+
+
+
 async def update_streak(
     discord_id,
     result
@@ -105,7 +124,6 @@ async def update_streak(
         (discord_id,)
         )
 
-
         old = await cursor.fetchone()
 
 
@@ -113,31 +131,43 @@ async def update_streak(
 
             streak_type, count = old
 
+
             if streak_type == result:
+
                 count += 1
+
             else:
+
                 count = 1
+
 
 
             await db.execute(
             """
             UPDATE users
-            SET streak_type=?,
+
+            SET
+
+            streak_type=?,
             streak_count=?
+
             WHERE discord_id=?
+
             """,
+
             (
                 result,
                 count,
                 discord_id
             ))
 
-
         await db.commit()
 
 
 
-async def match_exists(match_id):
+async def match_exists(
+    match_id
+):
 
     async with aiosqlite.connect(DATABASE) as db:
 
@@ -154,7 +184,9 @@ async def match_exists(match_id):
 
 
 
-async def save_match(match_id):
+async def save_match(
+    match_id
+):
 
     async with aiosqlite.connect(DATABASE) as db:
 
@@ -166,4 +198,4 @@ async def save_match(match_id):
         (match_id,)
         )
 
-        await db.commit()
+        await db.commit()        await db.commit()

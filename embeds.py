@@ -1,81 +1,105 @@
 #Chat am running out of jokes
-
 import discord
 
 
 
+QUEUE_NAMES = {
+
+    400: "Normal Draft",
+    420: "Ranked Solo/Duo",
+    430: "Normal Blind",
+    440: "Ranked Flex",
+    450: "ARAM"
+
+}
+
+
+
 def create_match_embed(
-    match
+    match,
+    party_players
 ):
+
 
     info = match["info"]
 
 
-    victory = False
 
-
-    for player in info["participants"]:
-
-        if player["win"]:
-            victory = True
-            break
+    victory = party_players[0]["win"]
 
 
 
     embed = discord.Embed(
 
         title=(
-            "VICTORY"
+
+            "🏆 VICTORY"
+
             if victory
+
             else
-            "DEFEAT"
+
+            "💀 DEFEAT"
+
         ),
 
         color=(
-            0x00ff00
+
+            discord.Color.green()
+
             if victory
+
             else
-            0xff0000
+
+            discord.Color.red()
+
         )
 
     )
 
 
 
-    embed.add_field(
-        name="Queue",
-        value=str(info["queueId"]),
-        inline=True
+    queue = QUEUE_NAMES.get(
+
+        info["queueId"],
+
+        f"Queue {info['queueId']}"
+
     )
 
 
+
+    duration = (
+
+        f"{info['gameDuration']//60}:"
+
+        f"{info['gameDuration']%60:02}"
+
+    )
+
+
+
     embed.add_field(
-        name="Duration",
+
+        name="Match Info",
+
         value=(
-            f"{info['gameDuration']//60}:"
-            f"{info['gameDuration']%60:02}"
+
+            f"🎮 {queue}\n"
+
+            f"⏱️ {duration}\n"
+
+            f"👥 Party Size: {len(party_players)}"
+
         ),
-        inline=True
+
+        inline=False
+
     )
 
 
 
-    for player in info["participants"]:
-
-
-        text = (
-
-            f"Champion:\n"
-            f"{player['championName']}\n\n"
-
-            f"KDA:\n"
-            f"{player['kills']}/"
-            f"{player['deaths']}/"
-            f"{player['assists']}\n\n"
-
-            f"Highlights:\n"
-
-        )
+    for player in party_players:
 
 
 
@@ -83,26 +107,32 @@ def create_match_embed(
 
 
 
-        if player["pentaKills"]:
+        if player.get("pentaKills",0):
 
             highlights.append(
-                f"Pentakill x{player['pentaKills']}"
+
+                f"💥 Pentakill x{player['pentaKills']}"
+
             )
 
 
 
-        if player["quadraKills"]:
+        if player.get("quadraKills",0):
 
             highlights.append(
-                f"Quadra Kill x{player['quadraKills']}"
+
+                f"💥 Quadra Kill x{player['quadraKills']}"
+
             )
 
 
 
-        if player["tripleKills"]:
+        if player.get("tripleKills",0):
 
             highlights.append(
-                f"Triple Kill x{player['tripleKills']}"
+
+                f"⚔️ Triple Kill x{player['tripleKills']}"
+
             )
 
 
@@ -115,17 +145,31 @@ def create_match_embed(
 
 
 
-        text += "\n".join(
-            highlights
-        )
-
-
-
         embed.add_field(
 
-            name=f"{player['summonerName']}",
+            name=(
 
-            value=text,
+                f"👤 {player['summonerName']}"
+
+            ),
+
+            value=(
+
+                f"🧙 Champion: **{player['championName']}**\n"
+
+                f"⚔️ KDA: **"
+
+                f"{player['kills']}/"
+
+                f"{player['deaths']}/"
+
+                f"{player['assists']}**\n"
+
+                f"⭐ Highlights: "
+
+                f"{', '.join(highlights)}"
+
+            ),
 
             inline=False
 
@@ -133,4 +177,4 @@ def create_match_embed(
 
 
 
-    return embed
+    return embed    return embed
