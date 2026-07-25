@@ -51,7 +51,7 @@ async def get_recent_matches(
     url = (
         f"{RIOT_REGION}/lol/match/v5/"
         f"matches/by-puuid/{puuid}/ids"
-        "?start=0&count=1"
+        "?start=0&count=5"
     )
 
     return await riot_request(url)

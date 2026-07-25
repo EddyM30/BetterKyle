@@ -41,6 +41,21 @@ def set_bot(
 
 
 
+def get_match_end_time(
+    match
+):
+
+    info = match["info"]
+
+    return info.get(
+        "gameEndTimestamp"
+    ) or info.get(
+        "gameCreation",
+        0
+    )
+
+
+
 async def check_matches_once(
     target_puuid=None
 ):
@@ -97,7 +112,46 @@ async def _check_matches_once(
 
 
 
-        match_id = matches[0]
+        recent_matches = []
+
+
+
+        for match_id in matches:
+
+            match = await get_match(
+                match_id
+            )
+
+
+
+            if not match:
+
+                # Do not choose an older match while Riot is still making a
+                # newer one available through the match API.
+                api_lookup_failed = True
+
+                break
+
+
+
+            recent_matches.append(
+                (match_id, match)
+            )
+
+
+
+        if api_lookup_failed:
+
+            continue
+
+
+
+        match_id, match = max(
+            recent_matches,
+            key=lambda candidate: get_match_end_time(
+                candidate[1]
+            )
+        )
 
 
 
@@ -113,21 +167,6 @@ async def _check_matches_once(
 
 
         if match_id == user[4]:
-
-            continue
-
-
-
-        match = await get_match(
-            match_id
-        )
-
-
-
-        if not match:
-
-            # Do not move this account's marker until Riot returns the match.
-            api_lookup_failed = True
 
             continue
 
@@ -162,15 +201,6 @@ async def _check_matches_once(
 
 
     if api_lookup_failed:
-
-        for discord_id, match_id in baseline_marker_updates.items():
-
-            await update_last_match(
-                discord_id,
-                match_id
-            )
-
-
         return 0
 
 
@@ -183,9 +213,8 @@ async def _check_matches_once(
 
         latest_match_id, latest_match = max(
             candidates,
-            key=lambda candidate: candidate[1]["info"].get(
-                "gameEndTimestamp",
-                candidate[1]["info"].get("gameCreation", 0)
+            key=lambda candidate: get_match_end_time(
+                candidate[1]
             )
         )
 
