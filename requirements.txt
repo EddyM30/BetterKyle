@@ -1,0 +1,6 @@
+#Building Blocks
+
+discord.py
+python-dotenv
+aiohttp
+aiosqlite

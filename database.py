@@ -1,0 +1,169 @@
+#Talk to me SQL
+#HATE SQL someone can look it over later
+
+import aiosqlite
+
+
+DATABASE = "users.db"
+
+
+
+async def setup_database():
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+
+            discord_id INTEGER PRIMARY KEY,
+
+            puuid TEXT UNIQUE,
+
+            riot_name TEXT,
+
+            riot_tag TEXT,
+
+            last_match TEXT,
+
+            streak_type TEXT,
+
+            streak_count INTEGER DEFAULT 0
+
+        )
+        """)
+
+
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS matches(
+
+            match_id TEXT PRIMARY KEY
+
+        )
+        """)
+
+
+        await db.commit()
+
+
+
+async def add_user(
+    discord_id,
+    puuid,
+    name,
+    tag
+):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        await db.execute(
+        """
+        INSERT OR REPLACE INTO users
+        (
+        discord_id,
+        puuid,
+        riot_name,
+        riot_tag
+        )
+        VALUES(?,?,?,?)
+        """,
+        (
+            discord_id,
+            puuid,
+            name,
+            tag
+        ))
+
+        await db.commit()
+
+
+
+async def get_users():
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cursor = await db.execute(
+            "SELECT * FROM users"
+        )
+
+        return await cursor.fetchall()
+
+
+
+async def update_streak(
+    discord_id,
+    result
+):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cursor = await db.execute(
+        """
+        SELECT streak_type, streak_count
+        FROM users
+        WHERE discord_id=?
+        """,
+        (discord_id,)
+        )
+
+
+        old = await cursor.fetchone()
+
+
+        if old:
+
+            streak_type, count = old
+
+            if streak_type == result:
+                count += 1
+            else:
+                count = 1
+
+
+            await db.execute(
+            """
+            UPDATE users
+            SET streak_type=?,
+            streak_count=?
+            WHERE discord_id=?
+            """,
+            (
+                result,
+                count,
+                discord_id
+            ))
+
+
+        await db.commit()
+
+
+
+async def match_exists(match_id):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        cursor = await db.execute(
+        """
+        SELECT match_id
+        FROM matches
+        WHERE match_id=?
+        """,
+        (match_id,)
+        )
+
+        return await cursor.fetchone()
+
+
+
+async def save_match(match_id):
+
+    async with aiosqlite.connect(DATABASE) as db:
+
+        await db.execute(
+        """
+        INSERT OR IGNORE INTO matches
+        VALUES(?)
+        """,
+        (match_id,)
+        )
+
+        await db.commit()

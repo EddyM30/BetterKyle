@@ -1,0 +1,13 @@
+#Don't Touch My Tings
+
+#API Keys
+.env
+
+
+#OtherStuff
+.venv/
+__pycache__/
+*.pyc
+users.db
+.DS_Store
+.idea/

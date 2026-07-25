@@ -1,0 +1,11 @@
+{
+  "tracked_region": "NA1",
+  "check_interval_minutes": 5,
+  "allowed_queues": [
+    400,
+    420,
+    430,
+    440,
+    450
+  ]
+}
