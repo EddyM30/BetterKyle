@@ -27,9 +27,9 @@ def _play_response(outcome: PlayOutcome) -> str:
             f"**{outcome.collection_name}**."
         )
         if outcome.started:
-            message += " Playback started."
+            message += " Playback is starting."
     elif outcome.started:
-        message = f"Now playing **{outcome.first_track_label}**."
+        message = f"Starting **{outcome.first_track_label}**."
     else:
         message = f"Added **{outcome.first_track_label}** to the queue."
 
@@ -202,7 +202,8 @@ def setup_music_commands(
         player = controller.active_player()
         if player is None:
             await interaction.response.send_message(
-                "The music queue is empty.", ephemeral=True
+                "Nothing is playing and there are no upcoming tracks.",
+                ephemeral=True,
             )
             return
         await interaction.response.send_message(

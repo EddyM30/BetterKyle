@@ -10,8 +10,9 @@ from unittest.mock import AsyncMock, Mock, patch
 import aiohttp
 import wavelink
 
+from music.commands import _play_response
 from music.helpers import build_now_playing_embed, build_queue_embed
-from music.player import MusicController
+from music.player import MusicController, PlayOutcome
 from music.radio_stations import (
     DEFAULT_RADIO_STATION_KEY,
     RADIO_STATIONS,
@@ -56,10 +57,13 @@ def _playlist(*titles: str) -> wavelink.Playlist:
 
 
 def _player(*, current: wavelink.Playable | None = None) -> SimpleNamespace:
+    queue = wavelink.Queue()
+    if current is not None:
+        queue._loaded = current
     return SimpleNamespace(
         connected=True,
         current=current,
-        queue=wavelink.Queue(),
+        queue=queue,
         autoplay=wavelink.AutoPlayMode.partial,
         _previous=None,
         paused=False,
@@ -229,6 +233,152 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(player.play.await_args.args[0], radio_track)
         self.assertTrue(controller.state.is_radio)
         self.assertIs(controller.state.radio_station, RADIO_STATIONS["live105"])
+
+    async def test_radio_to_single_music_replaces_stream_with_no_upcoming_items(
+        self,
+    ) -> None:
+        radio_track = _track("LIVE 105 Stream")
+        radio_track.extras = {
+            "playback_token": "radio-1",
+            "origin_source": "Live Radio",
+        }
+        player = _player(current=radio_track)
+        controller = self._controller(player)
+        controller.state.enter_radio_mode(
+            RADIO_STATIONS["live105"],
+            text_channel_id=100,
+            playback_token="radio-1",
+        )
+        controller._search = AsyncMock(  # type: ignore[method-assign]
+            return_value=[_track("Song")]
+        )
+
+        async def adopt_track(track: wavelink.Playable, **_: object) -> None:
+            player.current = track
+
+        player.play.side_effect = adopt_track
+
+        outcome = await controller.play_query(
+            self._interaction(),  # type: ignore[arg-type]
+            "Song",
+        )
+
+        self.assertTrue(outcome.started)
+        self.assertFalse(controller.state.is_radio)
+        self.assertEqual(player.current.title, "Song")
+        self.assertTrue(player.queue.is_empty)
+        self.assertEqual(player.autoplay, wavelink.AutoPlayMode.partial)
+        self.assertTrue(player.play.await_args.kwargs["replace"])
+        self.assertFalse(player.play.await_args.kwargs["paused"])
+
+    async def test_music_load_failure_notifies_once_without_double_advancing(
+        self,
+    ) -> None:
+        channel = SimpleNamespace(send=AsyncMock())
+        controller = MusicController(  # type: ignore[arg-type]
+            SimpleNamespace(get_channel=lambda _: channel)
+        )
+        failed = _track("Unavailable")
+        controller._set_track_metadata(
+            failed,
+            interaction=self._interaction(),  # type: ignore[arg-type]
+            origin_source="SoundCloud",
+        )
+        player = _player(current=failed)
+        player.queue.put(_track("Next"))
+        controller.state.attach_player(player)  # type: ignore[arg-type]
+        exception_payload = wavelink.TrackExceptionEventPayload(
+            player=player,  # type: ignore[arg-type]
+            track=failed,
+            exception={
+                "message": "Something broke when playing the track.",
+                "severity": "common",
+                "cause": "HTTP 404",
+            },
+        )
+        end_payload = wavelink.TrackEndEventPayload(
+            player=player,  # type: ignore[arg-type]
+            track=failed,
+            reason="loadFailed",
+        )
+
+        await controller.handle_track_exception(exception_payload)
+        # Wavelink clears current before dispatching TrackEnd. BetterKyle must
+        # leave the queue untouched so Wavelink's own AutoPlay advances once.
+        player.current = None
+        await controller.handle_track_end(end_payload)
+
+        channel.send.assert_awaited_once()
+        notice = channel.send.await_args.args[0]
+        self.assertIn("Unavailable", notice)
+        self.assertIn("More tracks remain queued", notice)
+        self.assertEqual([track.title for track in player.queue], ["Next"])
+        player.play.assert_not_awaited()
+        player.skip.assert_not_awaited()
+
+    async def test_music_load_failed_end_reports_when_exception_event_is_missed(
+        self,
+    ) -> None:
+        channel = SimpleNamespace(send=AsyncMock())
+        controller = MusicController(  # type: ignore[arg-type]
+            SimpleNamespace(get_channel=lambda _: channel)
+        )
+        failed = _track("Unavailable")
+        controller._set_track_metadata(
+            failed,
+            interaction=self._interaction(),  # type: ignore[arg-type]
+            origin_source="SoundCloud",
+        )
+        player = _player(current=failed)
+        controller.state.attach_player(player)  # type: ignore[arg-type]
+        payload = wavelink.TrackEndEventPayload(
+            player=player,  # type: ignore[arg-type]
+            track=failed,
+            reason="loadFailed",
+        )
+
+        player.current = None
+        await controller.handle_track_end(payload)
+
+        channel.send.assert_awaited_once()
+        notice = channel.send.await_args.args[0]
+        self.assertIn("couldn't load its audio", notice)
+        self.assertIn("Nothing else is queued", notice)
+
+    async def test_stale_music_failure_does_not_report_the_new_current_track(
+        self,
+    ) -> None:
+        channel = SimpleNamespace(send=AsyncMock())
+        controller = MusicController(  # type: ignore[arg-type]
+            SimpleNamespace(get_channel=lambda _: channel)
+        )
+        old = _track("Old")
+        new = _track("New")
+        controller._set_track_metadata(
+            old,
+            interaction=self._interaction(),  # type: ignore[arg-type]
+            origin_source="SoundCloud",
+        )
+        controller._set_track_metadata(
+            new,
+            interaction=self._interaction(),  # type: ignore[arg-type]
+            origin_source="SoundCloud",
+        )
+        player = _player(current=new)
+        controller.state.attach_player(player)  # type: ignore[arg-type]
+        payload = wavelink.TrackExceptionEventPayload(
+            player=player,  # type: ignore[arg-type]
+            track=old,
+            exception={
+                "message": "Late failure",
+                "severity": "common",
+                "cause": "HTTP 404",
+            },
+        )
+
+        await controller.handle_track_exception(payload)
+
+        channel.send.assert_not_awaited()
 
     async def test_failed_startup_node_can_be_registered_on_a_later_retry(self) -> None:
         controller = MusicController(SimpleNamespace())  # type: ignore[arg-type]
@@ -439,6 +589,29 @@ class MusicStateAndRadioTests(unittest.TestCase):
 
         self.assertTrue(embed.fields)
         self.assertTrue(all(len(field.value) <= 1_024 for field in embed.fields))
+
+    def test_empty_upcoming_queue_is_distinct_from_current_playback(self) -> None:
+        player = _player(current=_track("Current"))
+
+        embed = build_queue_embed(player, [])  # type: ignore[arg-type]
+
+        fields = {field.name: field.value for field in embed.fields}
+        self.assertIn("Current", fields["Now Playing"])
+        self.assertEqual(fields["Up Next"], "No upcoming tracks.")
+
+    def test_play_response_does_not_claim_audio_is_already_playing(self) -> None:
+        response = _play_response(
+            PlayOutcome(
+                added=1,
+                failed=0,
+                started=True,
+                collection_name=None,
+                first_track_label="Artist — Song",
+                spotify=False,
+            )
+        )
+
+        self.assertEqual(response, "Starting **Artist — Song**.")
 
 
 if __name__ == "__main__":

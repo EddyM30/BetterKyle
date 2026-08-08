@@ -141,7 +141,7 @@ def build_queue_embed(
             EMBED_FIELD_VALUE_LIMIT,
         )
     else:
-        upcoming_value = "The queue is empty."
+        upcoming_value = "No upcoming tracks."
 
     embed.add_field(name="Up Next", value=upcoming_value, inline=False)
     return embed

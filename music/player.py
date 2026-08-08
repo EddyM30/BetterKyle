@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass
 import logging
@@ -71,6 +72,7 @@ class MusicController:
         self._node_task: asyncio.Task[bool] | None = None
         self._node_session: aiohttp.ClientSession | None = None
         self._playback_token_counter = 0
+        self._reported_music_failures: deque[str] = deque(maxlen=256)
 
     @property
     def node_connected(self) -> bool:
@@ -267,11 +269,32 @@ class MusicController:
         current = player.current
         if current is None:
             return False
+        return self._tracks_match(event_track, current)
+
+    def _is_loaded_track(
+        self,
+        player: wavelink.Player,
+        event_track: wavelink.Playable,
+    ) -> bool:
+        """Match TrackEnd after Wavelink has already cleared ``current``."""
+
+        loaded = player.queue.loaded
+        if loaded is None:
+            return False
+        return self._tracks_match(event_track, loaded)
+
+    def _tracks_match(
+        self,
+        event_track: wavelink.Playable,
+        active_track: wavelink.Playable,
+    ) -> bool:
+        """Compare BetterKyle generations, falling back to encoded identity."""
+
         event_token = self._playback_token(event_track)
-        current_token = self._playback_token(current)
-        if event_token is not None and current_token is not None:
-            return event_token == current_token
-        return event_track.encoded == current.encoded
+        active_token = self._playback_token(active_track)
+        if event_token is not None and active_token is not None:
+            return event_token == active_token
+        return event_track.encoded == active_track.encoded
 
     async def _resolve_spotify_tracks(
         self,
@@ -565,26 +588,74 @@ class MusicController:
         except discord.DiscordException:
             LOGGER.warning("Could not send music failure notice", exc_info=True)
 
-    async def handle_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
-        """Clean radio state if a live stream ends or drops naturally."""
+    async def _notify_music_failure(
+        self,
+        player: wavelink.Player | None,
+        track: wavelink.Playable,
+        *,
+        problem: str,
+    ) -> None:
+        """Report one asynchronous failure without competing with AutoPlay."""
 
-        if (
-            payload.player is not self.state.player
-            or payload.reason == "replaced"
-            or not self._is_active_radio_track(payload.track)
-        ):
+        if player is None or player is not self.state.player or self.state.is_radio:
             return
-        station = self.state.radio_station
-        channel_id = self.state.radio_text_channel_id
-        self.state.enter_music_mode()
-        payload.player.autoplay = wavelink.AutoPlayMode.partial
-        if station is not None:
-            LOGGER.warning(
-                "Radio stream ended for %s (%s)", station.name, payload.reason
-            )
-            await self._notify_channel(
-                channel_id,
-                f"📻 {station.name} stopped streaming. Use /radio to try again.",
+
+        token = self._playback_token(track)
+        origin = getattr(track.extras, "origin_source", None)
+        if token is None or origin == "Live Radio":
+            return
+        if token in self._reported_music_failures:
+            return
+
+        # TrackException and TrackEnd(loadFailed) are separate events for the
+        # same failure. Claim the token before the Discord request so racing
+        # handlers cannot emit duplicate notices.
+        self._reported_music_failures.append(token)
+
+        has_next = not player.queue.is_empty
+        action = (
+            "More tracks remain queued."
+            if has_next
+            else "Nothing else is queued; try a different search or SoundCloud URL."
+        )
+        label = track_label(track)
+        if len(label) > 180:
+            label = f"{label[:179]}…"
+        channel_id = getattr(track.extras, "request_channel_id", None)
+        await self._notify_channel(
+            channel_id,
+            f"⚠️ **{label}** {problem} {action}",
+        )
+
+    async def handle_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
+        """Clean radio state and surface asynchronous music load failures."""
+
+        if payload.player is not self.state.player or payload.reason == "replaced":
+            return
+
+        if self._is_active_radio_track(payload.track):
+            station = self.state.radio_station
+            channel_id = self.state.radio_text_channel_id
+            self.state.enter_music_mode()
+            payload.player.autoplay = wavelink.AutoPlayMode.partial
+            if station is not None:
+                LOGGER.warning(
+                    "Radio stream ended for %s (%s)", station.name, payload.reason
+                )
+                await self._notify_channel(
+                    channel_id,
+                    f"📻 {station.name} stopped streaming. Use /radio to try again.",
+                )
+            return
+
+        if payload.reason == "loadFailed" and self._is_loaded_track(
+            payload.player,
+            payload.track,
+        ):
+            await self._notify_music_failure(
+                payload.player,
+                payload.track,
+                problem="couldn't load its audio.",
             )
 
     async def handle_track_exception(
@@ -606,6 +677,17 @@ class MusicController:
                     channel_id,
                     f"📻 {station.name} could not continue streaming. Use /radio to retry.",
                 )
+            return
+
+        if payload.player is not None and self._is_current_track(
+            payload.player,
+            payload.track,
+        ):
+            await self._notify_music_failure(
+                payload.player,
+                payload.track,
+                problem="couldn't load its audio.",
+            )
 
     async def handle_track_stuck(
         self, payload: wavelink.TrackStuckEventPayload
@@ -622,6 +704,11 @@ class MusicController:
             elif not self._is_current_track(payload.player, payload.track):
                 return
             await payload.player.skip(force=True)
+            await self._notify_music_failure(
+                payload.player,
+                payload.track,
+                problem="stopped responding.",
+            )
 
     async def handle_inactive_player(self, player: wavelink.Player) -> None:
         """Disconnect after the configured no-playback timeout."""
