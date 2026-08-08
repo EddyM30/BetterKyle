@@ -1,0 +1,17 @@
+[Unit]
+Description=BetterKyle Lavalink audio node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<BETTERKYLE_USER>
+WorkingDirectory=/PATH/TO/BetterKyle/lavalink
+EnvironmentFile=/PATH/TO/BetterKyle/.env
+ExecStart=/usr/bin/java -jar /PATH/TO/BetterKyle/lavalink/Lavalink.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

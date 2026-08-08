@@ -1,13 +1,22 @@
-#Don't Touch My Tings
-
-#API Keys
+# Secrets and machine-local state
 .env
+users.db
+*.db-journal
+*.db-shm
+*.db-wal
 
-
-#OtherStuff
+# Python and tooling
 .venv/
 __pycache__/
-*.pyc
-users.db
-.DS_Store
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Lavalink runtime downloads and output
+lavalink/Lavalink.jar
+lavalink/plugins/
+lavalink/logs/
+
+# Editors and operating systems
 .idea/
+.DS_Store
