@@ -81,25 +81,30 @@ stop and resolve them manually. Do not force the pull.
 
 ## 5. Install packages and create `env`
 
-Oracle Ubuntu images commonly provide Python 3.10+. BetterKyle requires Python
-3.10 or newer.
+Ubuntu 20.04 provides Python 3.8, but BetterKyle requires Python 3.10 or newer.
+Use `uv` to install a project-local Python 3.12 and create the environment
+named `env`; this does not replace Ubuntu's system Python.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y python3 python3-venv python3-pip \
-  openjdk-17-jre-headless curl sqlite3
+sudo apt-get install -y openjdk-17-jre-headless curl sqlite3
 
-python3 --version
 java -version
 
+curl --fail --location --proto '=https' --tlsv1.2 \
+  -o /tmp/BetterKyle-uv-install.sh https://astral.sh/uv/install.sh
+sh /tmp/BetterKyle-uv-install.sh
+
 if [ ! -x "$BETTERKYLE_DIR/env/bin/python" ]; then
-  python3 -m venv "$BETTERKYLE_DIR/env"
+  "$HOME/.local/bin/uv" venv --python 3.12 "$BETTERKYLE_DIR/env"
 fi
 
-"$BETTERKYLE_DIR/env/bin/python" -m pip install --upgrade pip
-"$BETTERKYLE_DIR/env/bin/python" -m pip install \
+"$HOME/.local/bin/uv" pip install \
+  --python "$BETTERKYLE_DIR/env/bin/python" \
   -r "$BETTERKYLE_DIR/requirements.txt"
-"$BETTERKYLE_DIR/env/bin/python" -m pip check
+"$HOME/.local/bin/uv" pip check \
+  --python "$BETTERKYLE_DIR/env/bin/python"
+"$BETTERKYLE_DIR/env/bin/python" --version
 ```
 
 Do not create `.venv`; this deployment intentionally uses `env`.
@@ -109,7 +114,7 @@ Do not create `.venv`; this deployment intentionally uses `env`.
 Edit the existing file:
 
 ```bash
-sudoedit "$BETTERKYLE_DIR/.env"
+nano "$BETTERKYLE_DIR/.env"
 ```
 
 Keep the existing values and ensure these names exist:

@@ -2,8 +2,6 @@
 
 BetterKyle is a personal, single-server Discord bot built with `discord.py`. It links Discord users to Riot IDs, announces supported League of Legends matches, preserves match/streak state in SQLite, and provides queued music and live-radio playback through Wavelink and Lavalink.
 
-This repository is the local development fork. It is not the copy currently running on the Ubuntu production server.
-
 ## League features
 
 - Link Riot accounts by Riot ID (`GameName#TagLine`) and track them by PUUID.
