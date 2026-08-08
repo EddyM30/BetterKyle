@@ -26,13 +26,16 @@ Every other queue ID is rejected, even if Riot reports a Summoner's Rift map or 
 BetterKyle has one process-local player and FIFO queue for its one Discord server. It supports:
 
 - Spotify track, album, and playlist URLs through LavaSrc metadata.
-- SoundCloud track and playlist/set URLs.
-- Plain-text SoundCloud search.
+- SoundCloud track and playlist/set URLs mirrored to playable YouTube audio.
+- Plain-text YouTube Music search and direct YouTube URLs.
 - Automatic playback, ordered playlist insertion, queue display, remove, clear, shuffle, skip, pause/resume, and volume from 0–200%.
 - A configurable idle disconnect (300 seconds by default).
 - Direct HTTP/HTTPS live-radio streams through Lavalink.
 
-Spotify audio is **not** scraped or played directly. BetterKyle first loads Spotify metadata through LavaSrc, then asynchronously resolves each item to playable SoundCloud audio before it enters playback. Unresolved items are skipped while the remaining album or playlist continues, and Discord receives the added/failed counts.
+Spotify and SoundCloud metadata are not played directly. BetterKyle resolves
+each item to playable YouTube audio through the official youtube-source plugin
+before it enters playback. Unresolved items are skipped while the remaining
+album or playlist continues, and Discord receives the added/failed counts.
 
 The source-controlled station registry is [`music/radio_stations.py`](music/radio_stations.py). It currently includes:
 
@@ -46,7 +49,7 @@ The direct station URLs are kept in the registry rather than `.env`. Starting ra
 > The checked-in YAML and radio URLs were validated as direct AAC streams. The
 > LIVE 105 URL was also validated with a local Lavalink 4.2.2 process, which
 > resolved it as a non-seekable ADTS live stream. Live
-> Discord voice playback was not exercised end to end, and Spotify/SoundCloud
+> Discord voice playback was not exercised end to end, and Spotify/YouTube
 > playback still requires manual verification in the configured voice channel.
 
 ## Architecture
@@ -61,8 +64,9 @@ flowchart LR
     Music --> Wavelink["Wavelink 3.5.2"]
     Wavelink --> Lavalink["Lavalink 4.2.2"]
     Lavalink --> LavaSrc["LavaSrc 4.8.3"]
+    Lavalink --> YTSource["youtube-source 1.18.2"]
     LavaSrc --> Spotify["Spotify metadata"]
-    Lavalink --> SoundCloud["SoundCloud search and audio"]
+    YTSource --> YouTube["YouTube search and audio"]
     Lavalink --> Radio["Direct HTTP radio"]
     Radio --> Live105["LIVE 105 · 105.3 KITS"]
     Radio --> Mix1065["MIX 106.5 · 106.5 KEZR"]
@@ -86,7 +90,7 @@ Commands are registered only in the guild configured by `GUILD_ID`.
 
 | Command | Purpose |
 | --- | --- |
-| `/play query:<text-or-url>` | Play or enqueue a SoundCloud search/URL or Spotify URL. |
+| `/play query:<text-or-url>` | Play or enqueue a music search, Spotify/SoundCloud URL, or YouTube URL. |
 | `/radio station:<choice>` | Replace music with LIVE 105 or MIX 106.5; `live105` is the default choice. |
 | `/pause` / `/resume` | Pause or resume the active music or stream. |
 | `/skip` | Skip normal music; live radio correctly reports that it has no next track. |
@@ -143,7 +147,10 @@ source .venv/bin/activate
 python bot.py
 ```
 
-Lavalink is configured with SoundCloud and direct HTTP sources enabled, plus LavaSrc 4.8.3 for Spotify metadata. You can run League-only development without a working Lavalink node; music commands will report that playback is unavailable.
+Lavalink is configured with direct HTTP and SoundCloud metadata loading,
+LavaSrc 4.8.3 for Spotify metadata, and youtube-source 1.18.2 for music search
+and audio. You can run League-only development without a working Lavalink node;
+music commands will report that playback is unavailable.
 
 ## Configuration
 

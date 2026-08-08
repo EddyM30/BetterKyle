@@ -101,7 +101,7 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
 
         outcome = await controller.play_query(
             self._interaction(),  # type: ignore[arg-type]
-            "https://soundcloud.com/test/sets/playlist",
+            "https://youtube.com/playlist?list=test",
         )
 
         self.assertTrue(outcome.started)
@@ -143,7 +143,7 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
 
         outcome = await controller.play_query(
             self._interaction(),  # type: ignore[arg-type]
-            "https://soundcloud.com/test/sets/playlist",
+            "https://youtube.com/playlist?list=test",
         )
 
         self.assertFalse(outcome.started)
@@ -176,25 +176,30 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(player.queue.is_empty)
         self.assertEqual(controller.clear_queue(), 0)
 
-    async def test_spotify_resolution_preserves_order_and_reports_failures(
+    async def test_youtube_mirroring_preserves_order_and_reports_failures(
         self,
     ) -> None:
         controller = MusicController(SimpleNamespace())  # type: ignore[arg-type]
         metadata = [_track("First"), _track("Missing"), _track("Third")]
 
-        async def soundcloud_search(query: str, **_: object) -> list[wavelink.Playable]:
+        searches: list[str] = []
+
+        async def youtube_search(query: str, **_: object) -> list[wavelink.Playable]:
+            searches.append(query)
             if "Missing" in query:
                 return []
-            return [_track(f"Mirror {query.split()[0]}")]
+            title = query.removeprefix("ytmsearch:").split()[0]
+            return [_track(f"Mirror {title}")]
 
         with patch(
             "music.player.wavelink.Playable.search",
-            AsyncMock(side_effect=soundcloud_search),
+            AsyncMock(side_effect=youtube_search),
         ):
-            resolved, failed = await controller._resolve_spotify_tracks(
+            resolved, failed = await controller._resolve_mirrored_tracks(
                 metadata,
                 self._interaction(),  # type: ignore[arg-type]
                 object(),  # type: ignore[arg-type]
+                origin_source="Spotify → YouTube",
             )
 
         self.assertEqual(failed, 1)
@@ -206,10 +211,37 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(
             all(
-                track.extras.origin_source == "Spotify → SoundCloud"
+                track.extras.origin_source == "Spotify → YouTube"
                 for track in resolved
             )
         )
+        self.assertTrue(all(query.startswith("ytmsearch:") for query in searches))
+
+    async def test_soundcloud_url_uses_metadata_then_youtube_audio(self) -> None:
+        player = _player()
+        controller = self._controller(player)
+        soundcloud_metadata = _track("SoundCloud Metadata")
+        youtube_audio = _track("YouTube Audio")
+        controller._search = AsyncMock(  # type: ignore[method-assign]
+            return_value=[soundcloud_metadata]
+        )
+        controller._resolve_mirrored_tracks = AsyncMock(  # type: ignore[method-assign]
+            return_value=([youtube_audio], 0)
+        )
+
+        outcome = await controller.play_query(
+            self._interaction(),  # type: ignore[arg-type]
+            "https://soundcloud.com/linkinpark/roads-untraveled",
+        )
+
+        self.assertTrue(outcome.started)
+        controller._resolve_mirrored_tracks.assert_awaited_once_with(
+            [soundcloud_metadata],
+            self._interaction(),
+            controller._require_node.return_value,
+            origin_source="SoundCloud → YouTube",
+        )
+        self.assertIs(player.play.await_args.args[0], youtube_audio)
 
     async def test_radio_replaces_playback_and_clears_the_music_queue(self) -> None:
         player = _player(current=_track("Current"))

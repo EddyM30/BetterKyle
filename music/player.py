@@ -20,12 +20,13 @@ from config import (
     MUSIC_IDLE_TIMEOUT_SECONDS,
     SPOTIFY_RESOLVE_CONCURRENCY,
 )
-from music.helpers import is_spotify_url, track_label
+from music.helpers import is_soundcloud_url, is_spotify_url, track_label
 from music.radio_stations import RadioStation
 from music.state import MusicState
 
 
 LOGGER = logging.getLogger(__name__)
+YOUTUBE_MUSIC_SEARCH_PREFIX = "ytmsearch:"
 
 
 class MusicError(RuntimeError):
@@ -206,9 +207,7 @@ class MusicController:
         if self._query_is_url(query):
             return await wavelink.Playable.search(query, node=node)
         return await wavelink.Playable.search(
-            query,
-            source=wavelink.TrackSource.SoundCloud,
-            node=node,
+            f"{YOUTUBE_MUSIC_SEARCH_PREFIX}{query}", node=node
         )
 
     @staticmethod
@@ -296,13 +295,15 @@ class MusicController:
             return event_token == active_token
         return event_track.encoded == active_track.encoded
 
-    async def _resolve_spotify_tracks(
+    async def _resolve_mirrored_tracks(
         self,
         metadata_tracks: list[wavelink.Playable],
         interaction: discord.Interaction,
         node: wavelink.Node,
+        *,
+        origin_source: str,
     ) -> tuple[list[wavelink.Playable], int]:
-        """Resolve Spotify metadata to SoundCloud audio with bounded concurrency."""
+        """Resolve catalog metadata to YouTube audio with bounded concurrency."""
 
         semaphore = asyncio.Semaphore(SPOTIFY_RESOLVE_CONCURRENCY)
 
@@ -311,13 +312,12 @@ class MusicController:
                 query = f"{metadata.title} {metadata.author}"
                 try:
                     loaded = await wavelink.Playable.search(
-                        query,
-                        source=wavelink.TrackSource.SoundCloud,
+                        f"{YOUTUBE_MUSIC_SEARCH_PREFIX}{query}",
                         node=node,
                     )
                 except wavelink.WavelinkException:
                     LOGGER.warning(
-                        "SoundCloud resolution failed for Spotify track %s",
+                        "YouTube resolution failed for mirrored track %s",
                         metadata.title,
                         exc_info=True,
                     )
@@ -331,7 +331,7 @@ class MusicController:
                 self._set_track_metadata(
                     playable,
                     interaction=interaction,
-                    origin_source="Spotify → SoundCloud",
+                    origin_source=origin_source,
                     display_title=metadata.title,
                     display_author=metadata.author,
                 )
@@ -365,18 +365,21 @@ class MusicController:
 
             metadata_tracks, collection_name = self._loaded_tracks(loaded)
             spotify = is_spotify_url(query)
-            if spotify:
-                tracks, failed = await self._resolve_spotify_tracks(
+            soundcloud = is_soundcloud_url(query)
+            if spotify or soundcloud:
+                mirror_source = "Spotify → YouTube" if spotify else "SoundCloud → YouTube"
+                tracks, failed = await self._resolve_mirrored_tracks(
                     metadata_tracks,
                     interaction,
                     node,
+                    origin_source=mirror_source,
                 )
             else:
                 tracks = metadata_tracks
                 failed = 0
                 for track in tracks:
                     source = (
-                        "SoundCloud" if track.source == "soundcloud" else track.source
+                        "YouTube" if track.source == "youtube" else track.source
                     )
                     self._set_track_metadata(
                         track,
@@ -616,7 +619,7 @@ class MusicController:
         action = (
             "More tracks remain queued."
             if has_next
-            else "Nothing else is queued; try a different search or SoundCloud URL."
+            else "Nothing else is queued; try a different search or URL."
         )
         label = track_label(track)
         if len(label) > 180:

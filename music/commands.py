@@ -35,9 +35,9 @@ def _play_response(outcome: PlayOutcome) -> str:
 
     if outcome.failed:
         message += (
-            f"\n{outcome.failed} Spotify track"
+            f"\n{outcome.failed} track"
             f"{'s' if outcome.failed != 1 else ''} could not be resolved "
-            "to playable SoundCloud audio and were skipped."
+            "to playable YouTube audio and were skipped."
         )
     return message
 
@@ -61,7 +61,7 @@ def setup_music_commands(
 
     @tree.command(
         name="play",
-        description="Play a Spotify/SoundCloud URL or search SoundCloud",
+        description="Play a music search, Spotify, SoundCloud, or YouTube URL",
         guild=guild,
     )
     @app_commands.describe(query="Track, album, playlist URL, or search text")

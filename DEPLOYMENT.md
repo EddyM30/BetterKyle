@@ -157,8 +157,8 @@ mkdir -p "$BETTERKYLE_DIR/lavalink/plugins" \
 ```
 
 The tracked `lavalink/application.yml` configures Lavalink 4.2.2, LavaSrc
-4.8.3, Spotify metadata, SoundCloud, and direct HTTP radio. LavaSrc downloads
-into `lavalink/plugins` on first start.
+4.8.3, youtube-source 1.18.2, Spotify/SoundCloud metadata mirroring to YouTube,
+and direct HTTP radio. Plugins download into `lavalink/plugins` on first start.
 
 ## 8. Start Lavalink
 

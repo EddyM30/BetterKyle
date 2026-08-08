@@ -32,6 +32,18 @@ def is_spotify_url(query: str) -> bool:
     }
 
 
+def is_soundcloud_url(query: str) -> bool:
+    """Return whether a query is a public SoundCloud URL."""
+
+    parsed = urlparse(query.strip())
+    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() in {
+        "soundcloud.com",
+        "www.soundcloud.com",
+        "m.soundcloud.com",
+        "on.soundcloud.com",
+    }
+
+
 def format_duration(milliseconds: int) -> str:
     """Format Lavalink milliseconds as M:SS or H:MM:SS."""
 
