@@ -12,7 +12,11 @@ import wavelink
 
 from music.helpers import build_now_playing_embed, build_queue_embed
 from music.player import MusicController
-from music.radio_stations import RADIO_STATIONS, get_radio_station
+from music.radio_stations import (
+    DEFAULT_RADIO_STATION_KEY,
+    RADIO_STATIONS,
+    get_radio_station,
+)
 from music.state import MusicState
 
 
@@ -311,7 +315,7 @@ class MusicQueueTests(unittest.IsolatedAsyncioTestCase):
 
 
 class MusicStateAndRadioTests(unittest.TestCase):
-    """Pin one-player radio transitions and LIVE 105 presentation."""
+    """Pin one-player radio transitions and station presentation."""
 
     def test_music_state_radio_transitions_and_can_skip(self) -> None:
         station = RADIO_STATIONS["live105"]
@@ -341,8 +345,11 @@ class MusicStateAndRadioTests(unittest.TestCase):
         state.reset()
         self.assertIsNone(state.player)
 
+    def test_radio_registry_keys_and_default_are_exact(self) -> None:
+        self.assertEqual(set(RADIO_STATIONS), {"live105", "mix1065"})
+        self.assertEqual(DEFAULT_RADIO_STATION_KEY, "live105")
+
     def test_live105_registry_url_and_lookup_are_exact(self) -> None:
-        self.assertEqual(set(RADIO_STATIONS), {"live105"})
         station = RADIO_STATIONS["live105"]
         self.assertEqual(station.key, "live105")
         self.assertEqual(station.name, "LIVE 105")
@@ -355,6 +362,19 @@ class MusicStateAndRadioTests(unittest.TestCase):
         )
         self.assertIs(get_radio_station(" LIVE105 "), station)
         self.assertIsNone(get_radio_station("unknown"))
+
+    def test_mix1065_registry_url_and_lookup_are_exact(self) -> None:
+        station = RADIO_STATIONS["mix1065"]
+        self.assertEqual(station.key, "mix1065")
+        self.assertEqual(station.name, "MIX 106.5")
+        self.assertEqual(station.frequency, "106.5")
+        self.assertEqual(station.callsign, "KEZR")
+        self.assertEqual(station.stream_type, "AAC/live HTTP stream")
+        self.assertEqual(
+            station.stream_url,
+            "https://live.amperwave.net/direct/alphacorporate-kezrfmaac-ibc4",
+        )
+        self.assertIs(get_radio_station(" MIX1065 "), station)
 
     def test_radio_nowplaying_embed_has_live_status_and_no_duration(self) -> None:
         state = MusicState()

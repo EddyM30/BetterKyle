@@ -47,6 +47,20 @@ class GuildCommandRegistrationTests(unittest.TestCase):
         assert isinstance(riot, app_commands.Group)
         self.assertEqual({command.name for command in riot.commands}, {"link"})
 
+        radio = tree.get_command("radio", guild=guild)
+        self.assertIsInstance(radio, app_commands.Command)
+        assert isinstance(radio, app_commands.Command)
+        station_parameter = radio.parameters[0]
+        self.assertEqual(station_parameter.name, "station")
+        self.assertEqual(station_parameter.default, "live105")
+        self.assertEqual(
+            [(choice.name, choice.value) for choice in station_parameter.choices],
+            [
+                ("LIVE 105 — 105.3 KITS", "live105"),
+                ("MIX 106.5 — 106.5 KEZR", "mix1065"),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

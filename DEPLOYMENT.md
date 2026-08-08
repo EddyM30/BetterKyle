@@ -131,8 +131,8 @@ SPOTIFY_CLIENT_SECRET=<spotify-client-secret>
 ```
 
 `LAVALINK_PASSWORD` must match Lavalink. Spotify values are needed for
-Spotify URLs. Do not add a radio URL variable; LIVE 105 is already defined in
-`music/radio_stations.py`.
+Spotify URLs. Do not add radio URL variables; the configured stations are
+already defined in `music/radio_stations.py`.
 
 ## 7. Install Lavalink
 
@@ -232,8 +232,8 @@ In Discord, verify:
 - `/play`, `/queue`, `/nowplaying`, `/skip`, `/stop`
 - `/shuffle`, `/volume`, `/disconnect`, `/clearqueue`, `/remove`
 - `/pause` and `/resume`
-- `/radio live105`
-- switching between LIVE 105 and `/play`
+- `/radio live105` and `/radio mix1065`
+- switching between each live station and `/play`
 - existing linked accounts and match history
 
 The tracker accepts only ARAM, Ranked Solo/Duo, Ranked Flex, Normal Draft, and

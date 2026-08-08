@@ -1,8 +1,8 @@
 # Manual production actions
 
 These are the actions that require access to accounts or to the Ubuntu server.
-All local code and source-controlled configuration, including the LIVE 105
-station URL, are already handled in this repository.
+All local code and source-controlled configuration, including the live-radio
+station URLs, are already handled in this repository.
 
 - [ ] Review `DEPLOYMENT.md`, schedule a maintenance window, and identify the
   real production checkout path, service user, BetterKyle unit name, and virtual
@@ -22,9 +22,9 @@ station URL, are already handled in this repository.
 - [ ] Confirm the Discord bot role has Connect, Speak, and Use Application
   Commands permissions in the intended channels.
 - [ ] Perform the documented cutover and complete the League, music, Spotify,
-  SoundCloud, queue, and LIVE 105 production verification checklist.
+  SoundCloud, queue, and live-radio production verification checklist.
 - [ ] Retain the protected database, `.env`, old commit, old venv, and deployment
   backup until the new version has been stable for an agreed retention period.
 
-There is no manual LIVE 105 URL task. Its public stream URL is source-controlled
-in `music/radio_stations.py`, not `.env`.
+There is no manual radio URL task. Public stream URLs are source-controlled in
+`music/radio_stations.py`, not `.env`.

@@ -25,7 +25,15 @@ RADIO_STATIONS: dict[str, RadioStation] = {
         callsign="KITS",
         stream_url="https://live.amperwave.net/direct/audacy-kitsfmaac-imc",
         stream_type="AAC/live HTTP stream",
-    )
+    ),
+    "mix1065": RadioStation(
+        key="mix1065",
+        name="MIX 106.5",
+        frequency="106.5",
+        callsign="KEZR",
+        stream_url="https://live.amperwave.net/direct/alphacorporate-kezrfmaac-ibc4",
+        stream_type="AAC/live HTTP stream",
+    ),
 }
 
 DEFAULT_RADIO_STATION_KEY = "live105"

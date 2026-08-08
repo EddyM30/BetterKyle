@@ -39,11 +39,13 @@ The source-controlled station registry is [`music/radio_stations.py`](music/radi
 | Key | Station | Stream |
 | --- | --- | --- |
 | `live105` | LIVE 105 · 105.3 KITS | AAC live HTTP stream |
+| `mix1065` | MIX 106.5 · 106.5 KEZR | AAC live HTTP stream |
 
-LIVE 105 uses `https://live.amperwave.net/direct/audacy-kitsfmaac-imc`. Starting radio replaces current music, clears the upcoming queue, and uses the same voice player. `/play` exits radio mode and returns to normal queued music. Add another station by adding one entry to `RADIO_STATIONS`; no database or new command is required.
+The direct station URLs are kept in the registry rather than `.env`. Starting radio replaces current music, clears the upcoming queue, and uses the same voice player. `/play` exits radio mode and returns to normal queued music. Add another station by adding one entry to `RADIO_STATIONS`; no database or new command is required.
 
-> The checked-in YAML and LIVE 105 URL were validated with a local Lavalink
-> 4.2.2 process; Lavalink resolved it as a non-seekable ADTS live stream. Live
+> The checked-in YAML and radio URLs were validated as direct AAC streams. The
+> LIVE 105 URL was also validated with a local Lavalink 4.2.2 process, which
+> resolved it as a non-seekable ADTS live stream. Live
 > Discord voice playback was not exercised end to end, and Spotify/SoundCloud
 > playback still requires manual verification in the configured voice channel.
 
@@ -63,6 +65,7 @@ flowchart LR
     Lavalink --> SoundCloud["SoundCloud search and audio"]
     Lavalink --> Radio["Direct HTTP radio"]
     Radio --> Live105["LIVE 105 · 105.3 KITS"]
+    Radio --> Mix1065["MIX 106.5 · 106.5 KEZR"]
 ```
 
 League startup is independent of Lavalink: if the node or its music credentials are unavailable, BetterKyle logs that music is unavailable and continues running League commands and polling.
@@ -84,12 +87,12 @@ Commands are registered only in the guild configured by `GUILD_ID`.
 | Command | Purpose |
 | --- | --- |
 | `/play query:<text-or-url>` | Play or enqueue a SoundCloud search/URL or Spotify URL. |
-| `/radio station:live105` | Replace music with LIVE 105; `live105` is the default choice. |
+| `/radio station:<choice>` | Replace music with LIVE 105 or MIX 106.5; `live105` is the default choice. |
 | `/pause` / `/resume` | Pause or resume the active music or stream. |
 | `/skip` | Skip normal music; live radio correctly reports that it has no next track. |
 | `/stop` | Stop playback, clear the queue/radio state, and remain in voice. |
 | `/queue` | Show the current item and up to ten upcoming tracks. |
-| `/nowplaying` | Show music progress/source/requester or LIVE radio status. |
+| `/nowplaying` | Show music progress/source/requester or live-radio status. |
 | `/shuffle` | Shuffle upcoming normal music. |
 | `/volume level:<0-200>` | Set and remember the player volume for this process. |
 | `/clearqueue` | Clear upcoming normal music. |
